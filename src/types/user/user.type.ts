@@ -1,0 +1,20 @@
+import z from "zod";
+
+export const UserSchema = z.object({
+    id: z.string().uuid().optional(),
+    Firstname: z.string().min(2),
+    Lastname: z.string().min(2),
+    email: z.string().email(),
+    password: z.string().min(8),
+    phone: z.string().min(10).optional(),
+    role: z.enum(["user", "admin"]).default("user"),
+    imageUrl: z.string().optional(), // for image URL storage
+    avatarUrl: z.string().optional(),
+    createdAt: z.string().optional(),
+    resetOtp: z.string().optional(),
+    resetOtpExpiresAt: z.union([z.string(), z.date()]).optional(),
+    resetOtpAttempts: z.number().optional()
+
+});
+
+export type UserType = z.infer<typeof UserSchema>;
