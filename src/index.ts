@@ -9,7 +9,7 @@ async function startServer() {
         await connectdb();
         
         // This is the ONLY place app.listen should be called
-        app.listen(PORT, () => {
+        app.listen(Number(PORT), "0.0.0.0", () => {
             logger.info(`Server is running on port ${PORT}`);
         });
     } catch (error) {
