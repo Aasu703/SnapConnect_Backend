@@ -7,6 +7,7 @@ const router = Router();
 const controller = new AlbumController();
 
 router.post("/", asyncHandler((req, res) => controller.createAlbum(req, res)));
+router.get("/", asyncHandler((req, res) => controller.getAllAlbums(req, res)));
 router.get("/:id", asyncHandler((req, res) => controller.getAlbum(req, res)));
 router.get("/user/:userId", asyncHandler((req, res) => controller.getUserAlbums(req, res)));
 

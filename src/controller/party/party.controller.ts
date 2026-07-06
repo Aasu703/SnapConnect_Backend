@@ -6,6 +6,14 @@ import { Album } from "../../models/album.model";
 import { Photo } from "../../models/photo.model";
 
 export class PartyController {
+    async getAllParties(req: Request, res: Response) {
+        try {
+            const parties = await Party.find().sort({ created_at: -1 });
+            return res.status(200).json({ success: true, data: parties });
+        } catch (error: any) {
+            return res.status(500).json({ success: false, message: error.message });
+        }
+    }
     async createParty(req: Request, res: Response) {
         try {
             const party = await Party.create(req.body);

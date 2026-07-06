@@ -7,6 +7,7 @@ const router = Router();
 const controller = new PartyController();
 
 router.post("/", asyncHandler((req, res) => controller.createParty(req, res)));
+router.get("/", asyncHandler((req, res) => controller.getAllParties(req, res)));
 router.post("/join", asyncHandler((req, res) => controller.joinParty(req, res)));
 router.get("/:id", asyncHandler((req, res) => controller.getParty(req, res)));
 router.get("/code/:code", asyncHandler((req, res) => controller.getPartyByJoinCode(req, res)));

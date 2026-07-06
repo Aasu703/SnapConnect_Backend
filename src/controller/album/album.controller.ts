@@ -4,6 +4,14 @@ import { Album } from "../../models/album.model";
 import { Photo } from "../../models/photo.model";
 
 export class AlbumController {
+    async getAllAlbums(req: Request, res: Response) {
+        try {
+            const albums = await Album.find().sort({ created_at: -1 });
+            return res.status(200).json({ success: true, data: albums });
+        } catch (error: any) {
+            return res.status(500).json({ success: false, message: error.message });
+        }
+    }
     async createAlbum(req: Request, res: Response) {
         try {
             const album = await Album.create(req.body);
