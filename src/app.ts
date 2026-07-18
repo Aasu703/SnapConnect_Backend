@@ -6,6 +6,7 @@ import photoRoutes from './routes/photo/photo.route';
 import albumRoutes from './routes/album/album.route';
 import partyRoutes from './routes/party/party.route';
 import cors from 'cors';
+import { requestLoggerMiddleware } from './middleware/request-logger.middleware';
 
 const app = express();
 
@@ -17,6 +18,7 @@ let corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(bodyParser.json());
+app.use(requestLoggerMiddleware);
 
 // Serve uploads directory statically
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

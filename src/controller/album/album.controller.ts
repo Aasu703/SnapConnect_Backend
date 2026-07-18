@@ -36,4 +36,13 @@ export class AlbumController {
             return res.status(500).json({ success: false, message: error.message });
         }
     }
+
+    async getPublicAlbums(req: Request, res: Response) {
+        try {
+            const albums = await Album.find({ is_private: false });
+            return res.status(200).json({ success: true, data: albums });
+        } catch (error: any) {
+            return res.status(500).json({ success: false, message: error.message });
+        }
+    }
 }
