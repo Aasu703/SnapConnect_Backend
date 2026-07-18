@@ -7,6 +7,7 @@ const albumSchema = new mongoose.Schema({
     created_by: { type: String },
     created_by_name: { type: String },
     photo_count: { type: Number, default: 0 },
+    is_private: { type: Boolean, default: false },
 }, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
 albumSchema.virtual('id').get(function() { return (this as any)._id.toHexString(); });
