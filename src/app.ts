@@ -5,6 +5,7 @@ import authRoutes from './routes/user/user.route';
 import photoRoutes from './routes/photo/photo.route';
 import albumRoutes from './routes/album/album.route';
 import partyRoutes from './routes/party/party.route';
+import reactionRoutes from './routes/reaction/reaction.route';
 import cors from 'cors';
 import { requestLoggerMiddleware } from './middleware/request-logger.middleware';
 
@@ -27,6 +28,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/photos', photoRoutes);
 app.use('/api/albums', albumRoutes);
 app.use('/api/parties', partyRoutes);
+app.use('/api/reactions', reactionRoutes);
 
 app.get('/', (req, res) => {
     res.send('Hello World!');
