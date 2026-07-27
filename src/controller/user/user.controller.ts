@@ -1,5 +1,11 @@
 import { UserService } from "../../services/user/user.service";
-import { CreateUserDTO, LoginUserDTO } from "../../dtos/user/user.dto";
+import {
+    CreateUserDTO,
+    LoginUserDTO,
+    RequestPasswordResetDTO,
+    ResetPasswordDTO,
+    VerifyResetOtpDTO,
+} from "../../dtos/user/user.dto";
 import { Request, Response } from "express";
 import z from "zod";
 import { UserModel } from "../../models/user/user.model";
@@ -49,6 +55,67 @@ export class AuthController {
                 { success: true, message: "Login successful", data: { user, accessToken: token }, token }
             );
 
+        } catch (error: Error | any) {
+            return res.status(error.statusCode ?? 500).json(
+                { success: false, message: error.message || "Internal Server Error" }
+            );
+        }
+    }
+
+    async requestPasswordReset(req: Request, res: Response) {
+        try {
+            const parsedData = RequestPasswordResetDTO.safeParse(req.body);
+            if (!parsedData.success) {
+                return res.status(400).json(
+                    { success: false, message: z.prettifyError(parsedData.error) }
+                );
+            }
+            await userService.requestPasswordReset(parsedData.data.email);
+            // Deliberately identical whether or not the email is registered,
+            // so this endpoint can't be used to enumerate accounts.
+            return res.status(200).json(
+                { success: true, message: "If that email is registered, a reset code is on its way." }
+            );
+        } catch (error: Error | any) {
+            return res.status(error.statusCode ?? 500).json(
+                { success: false, message: error.message || "Internal Server Error" }
+            );
+        }
+    }
+
+    async verifyResetOtp(req: Request, res: Response) {
+        try {
+            const parsedData = VerifyResetOtpDTO.safeParse(req.body);
+            if (!parsedData.success) {
+                return res.status(400).json(
+                    { success: false, message: z.prettifyError(parsedData.error) }
+                );
+            }
+            const { email, otp } = parsedData.data;
+            await userService.verifyPasswordResetOtp(email, otp);
+            return res.status(200).json(
+                { success: true, message: "Code verified" }
+            );
+        } catch (error: Error | any) {
+            return res.status(error.statusCode ?? 500).json(
+                { success: false, message: error.message || "Internal Server Error" }
+            );
+        }
+    }
+
+    async resetPassword(req: Request, res: Response) {
+        try {
+            const parsedData = ResetPasswordDTO.safeParse(req.body);
+            if (!parsedData.success) {
+                return res.status(400).json(
+                    { success: false, message: z.prettifyError(parsedData.error) }
+                );
+            }
+            const { email, otp, password } = parsedData.data;
+            await userService.resetPasswordWithOtp(email, otp, password);
+            return res.status(200).json(
+                { success: true, message: "Password updated. You can sign in now." }
+            );
         } catch (error: Error | any) {
             return res.status(error.statusCode ?? 500).json(
                 { success: false, message: error.message || "Internal Server Error" }

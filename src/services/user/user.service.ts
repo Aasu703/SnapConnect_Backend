@@ -1,15 +1,33 @@
 import { CreateUserDTO, LoginUserDTO, UpdateUserDto } from "../../dtos/user/user.dto";
 import bcryptjs from "bcryptjs";
+import crypto from "crypto";
 import { HttpError } from "../../errors/http-error";
 import jwt from "jsonwebtoken";
 import {  JWT_SECRET, } from "../../config";
 import { UserRepository } from "../../repositories/user/user.repository";
+import { sendPasswordResetOtp } from "../mail/mailer.service";
 
 
 const CLIENT_URL = process.env.CLIENT_URL as string;
 
+const OTP_LENGTH = 6;
+const OTP_TTL_MINUTES = 10;
+const OTP_MAX_ATTEMPTS = 5;
+
 export class UserService {
     constructor(private userRepository = new UserRepository()) {}
+
+    private issueToken(user: Record<string, any>) {
+        const payload = {
+            id: user._id,
+            email: user.email,
+            Firstname: user.Firstname,
+            Lastname: user.Lastname,
+            role: user.role,
+            phone: user.phone,
+        };
+        return jwt.sign(payload, JWT_SECRET, { expiresIn: "30d" });
+    }
 
     private sanitizeUser(user: Record<string, any>) {
         const plain = typeof user.toObject === "function" ? user.toObject() : user;
@@ -38,16 +56,86 @@ export class UserService {
         if(!validPassword){
             throw new HttpError(401, "Invalid credentials");
         }
-        const payload = {
-            id: user._id,
-            email:user.email,
-            Firstname:user.Firstname,
-            Lastname:user.Lastname,
-            role: user.role,
-            phone:user.phone
-        }
-        const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "30d" });
+        const token = this.issueToken(user as unknown as Record<string, any>);
         return { token, user: this.sanitizeUser(user as unknown as Record<string, any>) };
+    }
+
+    /// Emails a one-time code for password reset.
+    ///
+    /// Resolves the same way whether or not the address is registered — a
+    /// different response would let anyone enumerate accounts by email.
+    async requestPasswordReset(email: string) {
+        const user = await this.userRepository.getUserByEmail(email);
+        if (!user) {
+            return;
+        }
+
+        // crypto.randomInt is uniform and CSPRNG-backed; Math.random is neither
+        // and must not generate credentials.
+        const otp = crypto.randomInt(0, 10 ** OTP_LENGTH)
+            .toString()
+            .padStart(OTP_LENGTH, "0");
+
+        // Stored hashed so a database read can't be replayed as a valid reset.
+        const otpHash = await bcryptjs.hash(otp, 10);
+
+        await this.userRepository.updateUserById(user.id, {
+            resetOtp: otpHash,
+            resetOtpExpiresAt: new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000),
+            resetOtpAttempts: 0,
+        });
+
+        await sendPasswordResetOtp(user.email, otp, OTP_TTL_MINUTES);
+    }
+
+    /// Validates an OTP and consumes it, returning the owning user.
+    private async consumeResetOtp(email: string, otp: string) {
+        const user = await this.userRepository.getUserByEmail(email);
+        if (!user || !user.resetOtp || !user.resetOtpExpiresAt) {
+            throw new HttpError(400, "Invalid or expired code");
+        }
+
+        // The schema types this as string | Date, so normalize before comparing.
+        const expiresAt = new Date(user.resetOtpExpiresAt);
+        if (expiresAt.getTime() < Date.now()) {
+            await this.clearResetOtp(user.id);
+            throw new HttpError(400, "Invalid or expired code");
+        }
+
+        const attempts = user.resetOtpAttempts ?? 0;
+        if (attempts >= OTP_MAX_ATTEMPTS) {
+            await this.clearResetOtp(user.id);
+            throw new HttpError(429, "Too many incorrect attempts. Request a new code.");
+        }
+
+        const matches = await bcryptjs.compare(otp, user.resetOtp);
+        if (!matches) {
+            await this.userRepository.updateUserById(user.id, {
+                resetOtpAttempts: attempts + 1,
+            });
+            throw new HttpError(400, "Invalid or expired code");
+        }
+
+        return user;
+    }
+
+    private async clearResetOtp(userId: string) {
+        await this.userRepository.clearResetOtp(userId);
+    }
+
+    /// Checks an OTP without consuming it, so the app can advance to the
+    /// new-password step before the user commits.
+    async verifyPasswordResetOtp(email: string, otp: string) {
+        await this.consumeResetOtp(email, otp);
+    }
+
+    /// Completes a reset: validates the OTP, sets the new password, and
+    /// invalidates the code so it can't be reused.
+    async resetPasswordWithOtp(email: string, otp: string, newPassword: string) {
+        const user = await this.consumeResetOtp(email, otp);
+
+        const hashedPassword = await bcryptjs.hash(newPassword, 10);
+        await this.userRepository.setPasswordAndClearOtp(user.id, hashedPassword);
     }
 
     async getUserById(userId: string){

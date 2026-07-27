@@ -57,6 +57,30 @@ export class UserRepository {
         return UserModel.findByIdAndDelete(id).exec();
     }
 
+    /// Removes reset-OTP state. Uses $unset because Mongoose strips
+    /// `undefined` values from update objects, so assigning undefined via
+    /// updateUserById would silently leave a consumed OTP still valid.
+    async clearResetOtp(id: string): Promise<IUser | null> {
+        return UserModel.findByIdAndUpdate(
+            id,
+            { $unset: { resetOtp: "", resetOtpExpiresAt: "" }, $set: { resetOtpAttempts: 0 } },
+            { new: true },
+        ).exec();
+    }
+
+    /// Sets a new password and clears reset-OTP state in one atomic update, so
+    /// a consumed code can never outlive the password it reset.
+    async setPasswordAndClearOtp(id: string, hashedPassword: string): Promise<IUser | null> {
+        return UserModel.findByIdAndUpdate(
+            id,
+            {
+                $set: { password: hashedPassword, resetOtpAttempts: 0 },
+                $unset: { resetOtp: "", resetOtpExpiresAt: "" },
+            },
+            { new: true },
+        ).exec();
+    }
+
     async updateAdminRole(id: string, role: "user" | "admin" | "provider"): Promise<IUser | null> {
         return UserModel.findByIdAndUpdate(id, { role }, { new: true }).exec();
     }
