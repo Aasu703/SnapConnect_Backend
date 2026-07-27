@@ -5,7 +5,9 @@ export const UserSchema = z.object({
     Firstname: z.string().min(2),
     Lastname: z.string().min(2),
     email: z.string().email(),
-    password: z.string().min(8),
+    // Optional because Google-provisioned accounts have no local password.
+    password: z.string().min(8).optional(),
+    authProvider: z.enum(["local", "google"]).default("local"),
     phone: z.string().min(10).optional(),
     role: z.enum(["user", "admin"]).default("user"),
     imageUrl: z.string().optional(), // for image URL storage

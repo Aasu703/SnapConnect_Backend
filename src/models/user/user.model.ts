@@ -4,7 +4,10 @@ import { UserType } from "../../types/user/user.type";
 const UserSchema: Schema = new Schema<UserType>(
     {
         email: {type: String, required: true, unique: true, lowercase: true, trim: true, index: true},
-        password: {type: String, required: true},
+        // Not required: accounts created through Google sign-in have no local
+        // password. Email/password login rejects such accounts explicitly.
+        password: {type: String, required: false},
+        authProvider: {type: String, enum: ["local", "google"], default: "local"},
         Firstname: {type: String, required: true, trim: true},
         Lastname: {type: String, required: true, trim: true},
         phone: {type: String, index: true},

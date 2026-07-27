@@ -14,6 +14,24 @@ export class UserRepository {
         return user;
     }
 
+    /// Provisions an account for a verified Google identity. Deliberately has
+    /// no password field — email/password login rejects these accounts.
+    async createGoogleUser(data: {
+        email: string;
+        Firstname: string;
+        Lastname: string;
+        imageUrl?: string;
+    }): Promise<IUser> {
+        return UserModel.create({
+            email: data.email,
+            Firstname: data.Firstname,
+            Lastname: data.Lastname,
+            imageUrl: data.imageUrl,
+            authProvider: "google",
+            role: "user",
+        });
+    }
+
     async getUserByEmail(email: string): Promise<IUser | null> {
         return UserModel.findOne({ email }).exec();
     }

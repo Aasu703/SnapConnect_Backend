@@ -12,6 +12,9 @@ export const CreateUserDTO = UserSchema.pick(
     }
 ).extend(
     {
+        // UserSchema.password is optional so Google accounts can exist without
+        // one, but self-registration always requires a password.
+        password: z.string().min(8),
         confirmPassword: z.string().min(8)
     }
 ).refine(
@@ -33,6 +36,11 @@ export type LoginUserDTO = z.infer<typeof LoginUserDTO>;
 
 export const UpdateUserDto = UserSchema.partial();
 export type UpdateUserDto = z.infer<typeof UpdateUserDto>;
+
+export const GoogleSignInDTO = z.object({
+    idToken: z.string().min(1),
+});
+export type GoogleSignInDTO = z.infer<typeof GoogleSignInDTO>;
 
 export const RequestPasswordResetDTO = z.object({
     email: z.string().email().trim(),

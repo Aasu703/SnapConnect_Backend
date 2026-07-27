@@ -3,9 +3,12 @@ import bcryptjs from "bcryptjs";
 import crypto from "crypto";
 import { HttpError } from "../../errors/http-error";
 import jwt from "jsonwebtoken";
-import {  JWT_SECRET, } from "../../config";
+import { OAuth2Client, TokenPayload } from "google-auth-library";
+import {  JWT_SECRET, GOOGLE_CLIENT_ID, } from "../../config";
 import { UserRepository } from "../../repositories/user/user.repository";
 import { sendPasswordResetOtp } from "../mail/mailer.service";
+
+const googleClient = new OAuth2Client();
 
 
 const CLIENT_URL = process.env.CLIENT_URL as string;
@@ -60,10 +63,57 @@ export class UserService {
         if(!user){
             throw new HttpError(404, "User not found");
         }
+        if(!user.password){
+            // Google-provisioned account: there is no local password to check.
+            throw new HttpError(409, "This account uses Google sign-in. Continue with Google.");
+        }
         const validPassword = await bcryptjs.compare(data.password, user.password);
         if(!validPassword){
             throw new HttpError(401, "Invalid credentials");
         }
+        const token = this.issueToken(user as unknown as Record<string, any>);
+        return { token, user: this.sanitizeUser(user as unknown as Record<string, any>) };
+    }
+
+    /// Verifies a Google ID token and returns an app session, provisioning the
+    /// account on first sign-in.
+    async loginWithGoogle(idToken: string) {
+        if (!GOOGLE_CLIENT_ID) {
+            throw new HttpError(503, "Google sign-in is not configured on the server.");
+        }
+
+        let payload: TokenPayload | undefined;
+        try {
+            const ticket = await googleClient.verifyIdToken({
+                idToken,
+                // Pins the token's audience: without this any Google-issued
+                // token for any app would be accepted here.
+                audience: GOOGLE_CLIENT_ID,
+            });
+            payload = ticket.getPayload();
+        } catch (error) {
+            throw new HttpError(401, "Invalid Google token");
+        }
+
+        if (!payload?.email) {
+            throw new HttpError(401, "Google token has no email");
+        }
+        if (payload.email_verified === false) {
+            throw new HttpError(401, "Google email is not verified");
+        }
+
+        const email = payload.email.toLowerCase();
+        let user = await this.userRepository.getUserByEmail(email);
+
+        if (!user) {
+            user = await this.userRepository.createGoogleUser({
+                email,
+                Firstname: payload.given_name || "SnapConnect",
+                Lastname: payload.family_name || "User",
+                imageUrl: payload.picture,
+            });
+        }
+
         const token = this.issueToken(user as unknown as Record<string, any>);
         return { token, user: this.sanitizeUser(user as unknown as Record<string, any>) };
     }
@@ -75,6 +125,11 @@ export class UserService {
     async requestPasswordReset(email: string) {
         const user = await this.userRepository.getUserByEmail(email);
         if (!user) {
+            return;
+        }
+        if (!user.password) {
+            // Google-only account — there's no password to reset. Return
+            // quietly rather than explaining, so this stays non-enumerable.
             return;
         }
 

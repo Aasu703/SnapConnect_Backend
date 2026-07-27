@@ -20,6 +20,7 @@ const passwordResetLimiter = rateLimit({
 router.post("/register", asyncHandler((req, res) => authController.register(req, res)));
 router.post("/login", asyncHandler((req, res) => authController.login(req, res)));
 router.post("/logout", asyncHandler((req, res) => authController.logout(req, res)));
+router.post("/google", asyncHandler((req, res) => authController.googleSignIn(req, res)));
 
 router.post(
     "/forgot-password",
