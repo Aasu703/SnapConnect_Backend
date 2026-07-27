@@ -31,7 +31,15 @@ export class UserService {
 
     private sanitizeUser(user: Record<string, any>) {
         const plain = typeof user.toObject === "function" ? user.toObject() : user;
-        const { password, ...safeUser } = plain;
+        // toObject() bypasses the schema's toJSON transform, so strip the same
+        // credential fields here.
+        const {
+            password,
+            resetOtp,
+            resetOtpExpiresAt,
+            resetOtpAttempts,
+            ...safeUser
+        } = plain;
         return safeUser;
     }
 
@@ -85,7 +93,14 @@ export class UserService {
             resetOtpAttempts: 0,
         });
 
-        await sendPasswordResetOtp(user.email, otp, OTP_TTL_MINUTES);
+        try {
+            await sendPasswordResetOtp(user.email, otp, OTP_TTL_MINUTES);
+        } catch (error) {
+            // Must not propagate: an SMTP failure here would return a 500 for
+            // registered addresses while unknown ones still return 200, which
+            // is exactly the account enumeration this endpoint avoids.
+            console.error(`[auth] Failed to send reset OTP to ${user.email}:`, error);
+        }
     }
 
     /// Validates an OTP and consumes it, returning the owning user.

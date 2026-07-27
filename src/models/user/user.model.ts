@@ -26,9 +26,19 @@ UserSchema.virtual('id').get(function(this: IUser) {
     return this._id.toHexString();
 });
 
-// Ensure virtual fields are serialised
+// Ensure virtual fields are serialised, and strip credential material so it
+// can never reach a client through any route that returns a user document
+// (res.json() serialises via toJSON). Internal logic reads these off the
+// document itself and is unaffected.
 UserSchema.set('toJSON', {
     virtuals: true,
+    transform: (_doc, ret: Record<string, unknown>) => {
+        delete ret.password;
+        delete ret.resetOtp;
+        delete ret.resetOtpExpiresAt;
+        delete ret.resetOtpAttempts;
+        return ret;
+    },
 });
 
 export interface IUser extends UserType, Document {
