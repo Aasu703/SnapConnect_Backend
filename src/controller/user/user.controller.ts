@@ -218,6 +218,39 @@ export class AuthController {
     }
     }
 
+    async updateProfilePhoto(req: Request, res: Response) {
+        try {
+            const { userId } = req.body;
+            const file = req.file;
+
+            if (!userId) {
+                return res.status(400).json({ success: false, message: "userId is required" });
+            }
+            if (!file) {
+                return res.status(400).json({ success: false, message: "No file uploaded" });
+            }
+
+            const user = await UserModel.findById(userId);
+            if (!user) {
+                return res.status(404).json({ success: false, message: "User not found" });
+            }
+
+            user.imageUrl = `/uploads/${file.filename}`;
+            await user.save();
+
+            const userObject = user.toObject() as unknown as Record<string, unknown>;
+            delete userObject.password;
+
+            return res.status(200).json({
+                success: true,
+                message: "Profile photo updated",
+                data: userObject,
+            });
+        } catch (error: any) {
+            return res.status(500).json({ success: false, message: error.message });
+        }
+    }
+
     async logout(req: Request, res: Response) {
         try {
             // Clear the auth_token cookie

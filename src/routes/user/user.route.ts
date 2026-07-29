@@ -3,6 +3,7 @@ import rateLimit from "express-rate-limit";
 import { AuthController } from "../../controller/user/user.controller";
 import { authorizedMiddleware } from "../../middleware/authorization.middleware";
 import { asyncHandler } from "../../middleware/async-handler.middlerware";
+import { upload } from "../../middleware/multer.middleware";
 
 const router = Router();
 const authController = new AuthController();
@@ -39,6 +40,12 @@ router.post(
 );
 
 router.get('/whoami', authorizedMiddleware, asyncHandler((req, res) => authController.getUserProfile(req, res)));
+
+router.post(
+    "/update-profile",
+    upload.single("photo"),
+    asyncHandler((req, res) => authController.updateProfilePhoto(req, res)),
+);
 
 
 

@@ -31,7 +31,8 @@ export class AlbumController {
     async getUserAlbums(req: Request, res: Response) {
         try {
             const albums = await Album.find({ created_by: req.params.userId });
-            return res.status(200).json({ success: true, data: albums });
+            const data = await this.withPhotoCounts(albums);
+            return res.status(200).json({ success: true, data });
         } catch (error: any) {
             return res.status(500).json({ success: false, message: error.message });
         }
@@ -40,9 +41,29 @@ export class AlbumController {
     async getPublicAlbums(req: Request, res: Response) {
         try {
             const albums = await Album.find({ is_private: false });
-            return res.status(200).json({ success: true, data: albums });
+            const data = await this.withPhotoCounts(albums);
+            return res.status(200).json({ success: true, data });
         } catch (error: any) {
             return res.status(500).json({ success: false, message: error.message });
         }
+    }
+
+    /// Attaches a live photo_count to each album. The field stored on the
+    /// document is never incremented on upload, so it can't be trusted as-is —
+    /// this recomputes it from the Photo collection in one grouped query
+    /// instead of N+1 counts per album.
+    private async withPhotoCounts(albums: Array<InstanceType<typeof Album>>) {
+        const albumIds = albums.map((album) => album.id);
+        const counts = await Photo.aggregate([
+            { $match: { album_id: { $in: albumIds } } },
+            { $group: { _id: "$album_id", count: { $sum: 1 } } },
+        ]);
+        const countByAlbumId = new Map(counts.map((c) => [c._id, c.count]));
+
+        return albums.map((album) => {
+            const albumData = album.toJSON();
+            albumData.photo_count = countByAlbumId.get(album.id) ?? 0;
+            return albumData;
+        });
     }
 }
